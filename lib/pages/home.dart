@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -11,10 +13,16 @@ class _HomeState extends State<Home> {
   String _userToDo = '';
   List todoList = [];
 
+  void initFirebase() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+  }
+
   @override
   void initState() {
     super.initState();
-    todoList.addAll(['Купить молоко', 'Купить творог', 'Купить картошку']);
+    //initFirebase();
+    //todoList.addAll(['Купить молоко', 'Купить творог', 'Купить картошку']);
   }
 
   void _menuOpen(){
@@ -58,31 +66,33 @@ class _HomeState extends State<Home> {
           )
         ],
       ),
-      body: ListView.builder(
-        itemCount: todoList.length,
-        itemBuilder: (BuildContext context, int index){
-          return Dismissible(
-              key: Key(todoList[index]),
-              child: Card(
-                child: ListTile(
-                    title: Text(todoList[index]),
-                  trailing: IconButton(
-                    icon: Icon(
-                      Icons.delete_sweep,
-                      color: Colors.deepOrangeAccent,
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance.collection('items').snapshots(),
+        builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot){
+          if(!snapshot.hasData) return Text('Нет данных');
+          return ListView.builder(
+            itemCount: snapshot.data?.docs.length,
+            itemBuilder: (BuildContext context, int index){
+              return Dismissible(
+                key: Key(snapshot.data?.docs[index].id),
+                child: Card(
+                  child: ListTile(
+                    title: Text(snapshot.data?.docs[index].get('item')),
+                    trailing: IconButton(
+                      icon: Icon(
+                        Icons.delete_sweep,
+                        color: Colors.deepOrangeAccent,
+                      ),
+                      onPressed: (){
+                        FirebaseFirestore.instance.collection('items').doc(snapshot.data?.docs[index].id).delete();
+                      },
                     ),
-                    onPressed: (){
-                      setState(() {
-                        todoList.removeAt(index);
-                      });
-                    },
                   ),
                 ),
-              ),
-            onDismissed: (direction){
-              setState(() {
-                todoList.removeAt(index);
-              });
+                onDismissed: (direction){
+                  FirebaseFirestore.instance.collection('items').doc(snapshot.data?.docs[index].id).delete();
+                },
+              );
             },
           );
         },
@@ -101,9 +111,7 @@ class _HomeState extends State<Home> {
               actions: [
                 ElevatedButton(
                     onPressed: (){
-                      setState(() {
-                          todoList.add(_userToDo);
-                      });
+                      FirebaseFirestore.instance.collection('items').add({'item': _userToDo});
                       Navigator.of(context).pop();
                     },
                     child: Text('Добавить')
